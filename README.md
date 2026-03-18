@@ -48,3 +48,5 @@ This integration exposes the following entities. Please note that entities will 
     * Update Data
     * Start Charge
     * Climate
+      ![nissan_townstar_ev_ha](https://github.com/user-attachments/assets/72e12d6e-c2de-4638-8c0a-ba8fb1d5faac)
+
