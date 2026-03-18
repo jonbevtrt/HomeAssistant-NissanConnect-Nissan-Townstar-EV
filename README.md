@@ -19,7 +19,7 @@ This integration has been tested with the following vehicles:
 This is the recommended installation method.
 1. Search for and install the **NissanConnect [EU]** integration from HACS
 2. Restart Home Assistant
-3. uploud(replace file) kamereon.py
+**3. uploud(replace file) kamereon.py**
 
 ### Manual
 1. Download the [latest release](https://github.com/dan-r/HomeAssistant-NissanConnect/releases)
