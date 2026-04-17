@@ -625,9 +625,12 @@ class Vehicle:
         if 'errors' in body:
             raise ValueError(body['errors'])
         hvac_data = body['data']['attributes']
-        self.external_temperature = hvac_data.get('externalTemperature')
-        self.internal_temperature = hvac_data.get('internalTemperature')
-        self.next_target_temperature = hvac_data.get('nextTargetTemperature')
+        if 'externalTemperature' in hvac_data:
+            self.external_temperature = hvac_data.get('externalTemperature')
+        if 'internalTemperature' in hvac_data:
+            self.internal_temperature = hvac_data.get('internalTemperature')
+        if 'nextTargetTemperature' in hvac_data:
+            self.next_target_temperature = hvac_data.get('nextTargetTemperature')
         if 'hvacStatus' in hvac_data:
             self.hvac_status = hvac_data['hvacStatus'] == "on"
         if 'nextHvacStartDate' in hvac_data:
@@ -649,15 +652,13 @@ class Vehicle:
         return body
 
     def fetch_battery_status(self):
-        try:
-            self.fetch_battery_status_leaf()
-        except Exception as e:
-            _LOGGER.debug("fetch_battery_status_leaf() failed: %s", e)
         if self.model_name in ("Ariya"):
             self.fetch_battery_status_ariya()
         elif self.model_name in ("TOWNSTAR"):
             self.fetch_battery_status_townstar()
-
+        else:
+            self.fetch_battery_status_leaf()
+            
     def fetch_battery_status_leaf(self):
         """The battery-status endpoint isn't just for EV's. ICE Nissans publish the range under this!
            There is no obvious feature to qualify this, so we just suck it and see."""
@@ -715,24 +716,30 @@ class Vehicle:
 
         if not 'data' in body or not 'attributes' in body['data']:
             self.battery_supported = False
+            return
 
         battery_data = body['data']['attributes']
         
         self.range_hvac_off = None
-        self.range_hvac_on = battery_data.get('batteryAutonomy') or self.range_hvac_on
-        self.battery_level = battery_data.get('batteryLevel') or battery_data.get('stateOfCharge') or self.battery_level
-        self.total_mileage = battery_data.get('totalMileage') or battery_data.get('mileage') or self.total_mileage
+        if 'batteryAutonomy' in battery_data:
+            self.range_hvac_on = battery_data.get('batteryAutonomy') or self.range_hvac_on
+        if 'stateOfCharge' in battery_data or 'batteryLevel' in battery_data:
+            self.battery_level = battery_data.get('batteryLevel') or battery_data.get('stateOfCharge') or self.battery_level
+        if 'totalMileage' in battery_data or 'mileage' in battery_data:
+            self.total_mileage = battery_data.get('totalMileage') or battery_data.get('mileage') or self.total_mileage
         self.mileage = self.total_mileage
 
         self.charging_speed = ChargingSpeed(None)
-        self.charge_time_required_to_full = {
-            ChargingSpeed.FAST: None,
-            ChargingSpeed.NORMAL: None,
-            ChargingSpeed.SLOW: None,
-            ChargingSpeed.ADAPTIVE: battery_data.get('chargingRemainingTime') or self.charge_time_required_to_full[ChargingSpeed.NORMAL]
-        }
+        if 'chargingRemainingTime' in battery_data:
+            self.charge_time_required_to_full = {
+                ChargingSpeed.FAST: None,
+                ChargingSpeed.NORMAL: None,
+                ChargingSpeed.SLOW: None,
+                ChargingSpeed.ADAPTIVE: battery_data.get('chargingRemainingTime') or self.charge_time_required_to_full[ChargingSpeed.NORMAL]
+            }
 
-        self.plugged_in = PluggedStatus(battery_data.get('plugStatus', 0))
+        if 'plugStatus' in battery_data:
+            self.plugged_in = PluggedStatus(battery_data.get('plugStatus', 0))
                 
         if 'timestamp' in battery_data:
             self.battery_status_last_updated = datetime.datetime.fromisoformat(battery_data['timestamp'].replace('Z','+00:00'))
