@@ -707,7 +707,7 @@ class Vehicle:
 
     def fetch_battery_status_townstar(self):
         resp = self._get(
-            '{}v2/cars/{}/battery-status'.format(self.session.settings['user_base_url'], self.vin),
+            '{}v2/cars/{}/battery-status'.format(self.session.settings['car_adapter_base_url'], self.vin),
             headers={'Content-Type': 'application/vnd.api+json'}
         )
         body = resp.json()
