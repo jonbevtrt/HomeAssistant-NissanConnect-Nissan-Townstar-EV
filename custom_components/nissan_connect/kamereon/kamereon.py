@@ -254,6 +254,8 @@ class Vehicle:
         self.first_registration_date = data.get('firstRegistrationDate')
         self.ice_or_ev = data.get('iceEvFlag')
         self.model_name = data.get('modelName')
+        if self.model_name in ("TOWNSTAR"):
+            self.features.append(Feature.INTERIOR_TEMP_SETTINGS)
         self.model_code = data.get('modelCode')
         self.model_year = data.get('modelYear')
         self.nickname = data.get('nickname')
@@ -651,8 +653,10 @@ class Vehicle:
             self.fetch_battery_status_leaf()
         except Exception as e:
             _LOGGER.debug("fetch_battery_status_leaf() failed: %s", e)
-        if self.model_name in ("Ariya", "TOWNSTAR"):
+        if self.model_name in ("Ariya"):
             self.fetch_battery_status_ariya()
+        elif self.model_name in ("TOWNSTAR"):
+            self.fetch_battery_status_townstar()
 
     def fetch_battery_status_leaf(self):
         """The battery-status endpoint isn't just for EV's. ICE Nissans publish the range under this!
@@ -699,6 +703,39 @@ class Vehicle:
             self.unplugged_time = datetime.datetime.fromisoformat(battery_data['vehicleUnplugTimestamp'].replace('Z','+00:00'))
         if 'lastUpdateTime' in battery_data:
             self.battery_status_last_updated = datetime.datetime.fromisoformat(battery_data['lastUpdateTime'].replace('Z','+00:00'))
+
+    def fetch_battery_status_townstar(self):
+        resp = self._get(
+            '{}v2/cars/{}/battery-status'.format(self.session.settings['user_base_url'], self.vin),
+            headers={'Content-Type': 'application/vnd.api+json'}
+        )
+        body = resp.json()
+        if 'errors' in body and Feature.BATTERY_STATUS in self.features:
+            raise ValueError(body['errors'])
+
+        if not 'data' in body or not 'attributes' in body['data']:
+            self.battery_supported = False
+
+        battery_data = body['data']['attributes']
+        
+        self.range_hvac_off = None
+        self.range_hvac_on = battery_data.get('batteryAutonomy') or self.range_hvac_on
+        self.battery_level = battery_data.get('batteryLevel') or battery_data.get('stateOfCharge') or self.battery_level
+        self.total_mileage = battery_data.get('totalMileage') or battery_data.get('mileage') or self.total_mileage
+        self.mileage = self.total_mileage
+
+        self.charging_speed = ChargingSpeed(None)
+        self.charge_time_required_to_full = {
+            ChargingSpeed.FAST: None,
+            ChargingSpeed.NORMAL: None,
+            ChargingSpeed.SLOW: None,
+            ChargingSpeed.ADAPTIVE: battery_data.get('chargingRemainingTime') or self.charge_time_required_to_full[ChargingSpeed.NORMAL]
+        }
+
+        self.plugged_in = PluggedStatus(battery_data.get('plugStatus', 0))
+                
+        if 'timestamp' in battery_data:
+            self.battery_status_last_updated = datetime.datetime.fromisoformat(battery_data['timestamp'].replace('Z','+00:00'))
 
     def fetch_battery_status_ariya(self):
         resp = self._get(
@@ -774,9 +811,14 @@ class Vehicle:
         return [TripSummary(s, self.vin) for s in body['data']['attributes']['summaries']]
 
     def fetch_cockpit(self):
-        resp = self._get(
-            "{}v2/cars/{}/cockpit".format(self.session.settings['car_adapter_base_url'], self.vin)
-        )
+        if self.model_name in ("TOWNSTAR"):
+            resp = self._get(
+                "{}v2/cars/{}/cockpit".format(self.session.settings['car_adapter_base_url'], self.vin)
+            )
+        else:
+            resp = self._get(
+                "{}v1/cars/{}/cockpit".format(self.session.settings['car_adapter_base_url'], self.vin)
+            )
         body = resp.json()
         if 'errors' in body:
             raise ValueError(body['errors'])
