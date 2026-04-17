@@ -711,14 +711,17 @@ class Vehicle:
             headers={'Content-Type': 'application/vnd.api+json'}
         )
         body = resp.json()
+        _LOGGER.debug("Townstar battery-status response received for vin=%s: keys=%s", self.vin, list(body.keys()))
         if 'errors' in body and Feature.BATTERY_STATUS in self.features:
             raise ValueError(body['errors'])
 
         if not 'data' in body or not 'attributes' in body['data']:
+            _LOGGER.debug("Townstar battery-status missing data/attributes for vin=%s: %s", self.vin, body)
             self.battery_supported = False
             return
 
         battery_data = body['data']['attributes']
+        _LOGGER.debug("Townstar battery attributes for vin=%s: %s", self.vin, battery_data)
         
         self.range_hvac_off = None
         if 'batteryAutonomy' in battery_data:
@@ -761,6 +764,17 @@ class Vehicle:
                 
         if 'timestamp' in battery_data:
             self.battery_status_last_updated = datetime.datetime.fromisoformat(battery_data['timestamp'].replace('Z','+00:00'))
+
+        _LOGGER.debug(
+            "Townstar battery parsed for vin=%s: level=%s autonomy=%s plugged_in=%s charging=%s remaining=%s timestamp=%s",
+            self.vin,
+            self.battery_level,
+            self.range_hvac_on,
+            self.plugged_in,
+            self.charging,
+            self.charge_time_required_to_full.get(ChargingSpeed.ADAPTIVE),
+            self.battery_status_last_updated
+        )
 
     def fetch_battery_status_ariya(self):
         resp = self._get(
