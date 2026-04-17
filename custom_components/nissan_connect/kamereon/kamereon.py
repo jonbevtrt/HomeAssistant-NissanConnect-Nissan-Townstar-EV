@@ -722,11 +722,19 @@ class Vehicle:
         
         self.range_hvac_off = None
         if 'batteryAutonomy' in battery_data:
-            self.range_hvac_on = battery_data.get('batteryAutonomy') or self.range_hvac_on
+            self.range_hvac_on = battery_data.get('batteryAutonomy')
         if 'stateOfCharge' in battery_data or 'batteryLevel' in battery_data:
-            self.battery_level = battery_data.get('batteryLevel') or battery_data.get('stateOfCharge') or self.battery_level
+            battery_level = battery_data.get('batteryLevel')
+            if battery_level is None:
+                battery_level = battery_data.get('stateOfCharge')
+            if battery_level is not None:
+                self.battery_level = battery_level
         if 'totalMileage' in battery_data or 'mileage' in battery_data:
-            self.total_mileage = battery_data.get('totalMileage') or battery_data.get('mileage') or self.total_mileage
+            total_mileage = battery_data.get('totalMileage')
+            if total_mileage is None:
+                total_mileage = battery_data.get('mileage')
+            if total_mileage is not None:
+                self.total_mileage = total_mileage
         self.mileage = self.total_mileage
 
         self.charging_speed = ChargingSpeed(None)
@@ -735,11 +743,21 @@ class Vehicle:
                 ChargingSpeed.FAST: None,
                 ChargingSpeed.NORMAL: None,
                 ChargingSpeed.SLOW: None,
-                ChargingSpeed.ADAPTIVE: battery_data.get('chargingRemainingTime') or self.charge_time_required_to_full[ChargingSpeed.NORMAL]
+                ChargingSpeed.ADAPTIVE: battery_data.get('chargingRemainingTime')
             }
+
+        if 'chargingStatus' in battery_data:
+            charging_status = battery_data.get('chargingStatus')
+            if isinstance(charging_status, (int, float)):
+                # Townstar can return fractional charging progress/status (e.g. 0.4)
+                self.charging = ChargingStatus.CHARGING if charging_status > 0 else ChargingStatus.NOT_CHARGING
+            else:
+                self.charging = ChargingStatus(charging_status)
 
         if 'plugStatus' in battery_data:
             self.plugged_in = PluggedStatus(battery_data.get('plugStatus', 0))
+            if self.plugged_in == PluggedStatus.NOT_PLUGGED:
+                self.charging = ChargingStatus.NOT_CHARGING
                 
         if 'timestamp' in battery_data:
             self.battery_status_last_updated = datetime.datetime.fromisoformat(battery_data['timestamp'].replace('Z','+00:00'))
