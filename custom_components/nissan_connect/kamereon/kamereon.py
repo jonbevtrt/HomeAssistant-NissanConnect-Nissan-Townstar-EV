@@ -574,7 +574,7 @@ class Vehicle:
     def fetch_all(self):
         self.fetch_battery_status()
         
-        if self.model_name == "MICRA":
+        if (self.model_name or "").upper() == "MICRA":
             return
         
         self.fetch_cockpit()
@@ -894,7 +894,8 @@ class Vehicle:
         return body
 
     def fetch_battery_status(self):
-        if self.model_name == "MICRA" or self.model_name == "Ariya":
+        model = (self.model_name or "").upper()
+        if model == "MICRA" or model == "ARIYA":
             self.fetch_battery_status_ariya()
         else:
             self.fetch_battery_status_leaf()
